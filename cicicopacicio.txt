@@ -1,0 +1,208 @@
+È un obiettivo fantastico e molto lodevole. Imparare a costruire un progetto da soli, partendo da una struttura, è il modo migliore per consolidare le proprie competenze. Abbandonare l'aiuto dell'AI per la scrittura del codice ti costringerà a ragionare su ogni singolo passaggio, a leggere la documentazione e a risolvere i problemi in prima persona. Questa è la vera essenza della programmazione.
+
+Ti darò una guida strategica, un percorso da seguire passo dopo passo per trasformare quello schizzo in codice funzionante, scritto interamente da te.
+La Strategia: Un Pezzo alla Volta (Approccio Incrementale)
+
+Non cercare di scrivere tutto il progetto in una volta. Affronta un modulo alla volta, testalo e assicurati che funzioni prima di passare al successivo. Il tuo Jupyter Notebook (notebooks/01_exploration.ipynb) è il tuo migliore amico per questo approccio. Usalo come un laboratorio per sperimentare.
+Passo 1: L'Ambiente e le Dipendenze
+
+Prima di scrivere una sola riga di codice, prepara il terreno.
+
+    Crea l'ambiente virtuale: Apri un terminale nella cartella a_star_maps/ e digita:
+    code Bash
+
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+python -m venv .venv
+
+  
+
+Attiva l'ambiente:
+
+    macOS/Linux: source .venv/bin/activate
+
+    Windows: .venv\Scripts\activate
+
+Crea requirements.txt: Crea il file e scrivi dentro le librerie che ti serviranno. Inizia con le basi:
+code Code
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+osmnx
+networkx
+matplotlib
+jupyterlab
+
+  
+
+Installa le dipendenze: Nel terminale con l'ambiente attivo, esegui:
+code Bash
+
+    IGNORE_WHEN_COPYING_START
+    IGNORE_WHEN_COPYING_END
+
+        
+    pip install -r requirements.txt
+
+      
+
+Ora sei pronto a codificare.
+Passo 2: Caricare la Mappa (src/map_loader.py)
+
+Questo è il punto di partenza logico: senza una mappa, non puoi trovare un percorso.
+
+Obiettivo: Creare una classe MapLoader che scarica una mappa da OpenStreetMap e la salva su disco per non doverla riscaricare ogni volta.
+
+Il tuo processo mentale e di codifica:
+
+    Apri il notebook: Avvia Jupyter Lab (jupyter lab) dal terminale e apri 01_exploration.ipynb.
+
+    Domanda Guida: "Come si scarica una mappa con OSMnx?"
+
+    Azione: Cerca su Google "osmnx download map by city name" o consulta la documentazione di OSMnx. Troverai la funzione osmnx.graph_from_place().
+
+    Sperimenta nel Notebook:
+    code Python
+
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+import osmnx as ox
+place_name = "Milano, Italia"
+graph = ox.graph_from_place(place_name, network_type='drive') 
+ox.plot_graph(graph)
+
+  
+
+Domanda Successiva: "Come posso salvare questo grafo per non scaricarlo di nuovo?"
+
+Azione: Cerca "osmnx save graph". Troverai osmnx.save_graphml().
+
+Sperimenta:
+code Python
+
+    IGNORE_WHEN_COPYING_START
+    IGNORE_WHEN_COPYING_END
+
+        
+    ox.save_graphml(graph, filepath="cache/milano.graphml")
+
+      
+
+    Ora, trasferisci la logica in src/map_loader.py: Crea una classe MapLoader con un metodo che fa esattamente questo: controlla se il file esiste già nella cartella cache/, se sì lo carica, altrimenti lo scarica e lo salva.
+
+Passo 3: Le Euristiche (src/heuristics.py)
+
+Questo modulo è indipendente e si basa sulla matematica.
+
+Obiettivo: Scrivere funzioni Python pure che calcolano la distanza tra due punti geografici.
+
+Il tuo processo:
+
+    Domanda Guida: "Qual è la formula per la distanza di Haversine tra due punti con latitudine e longitudine?"
+
+    Azione: Cercala online. Troverai la formula matematica.
+
+    Implementa in Python: Apri il file src/heuristics.py e scrivi una funzione haversine_distance(node1_coords, node2_coords). Avrai bisogno del modulo math di Python (sin, cos, radians, etc.).
+
+    Testa nel Notebook: Crea due coordinate fittizie e chiama la tua funzione per vedere se restituisce un numero sensato. Confrontalo magari con un calcolatore online per validare il risultato.
+
+Passo 4: L'Algoritmo A* (src/pathfinder.py) - Il Cuore del Progetto
+
+Questa è la parte più sfidante e gratificante. Non avere fretta.
+
+Obiettivo: Implementare l'algoritmo A* da zero.
+
+Il tuo processo:
+
+    Rivedi la teoria: Riguarda il video che ti ha ispirato o leggi una guida su A*. Assicurati di aver capito bene i concetti chiave:
+
+        g(n): Il costo reale per arrivare al nodo n dal nodo di partenza.
+
+        h(n): Il costo stimato (euristica) dal nodo n al nodo di destinazione.
+
+        f(n) = g(n) + h(n): Il costo totale stimato del percorso che passa per n.
+
+        Open List: La lista dei nodi da valutare (una coda di priorità è la struttura dati ideale qui).
+
+        Closed List: L'insieme dei nodi già valutati.
+
+    Scrivi lo pseudocodice: Prima di scrivere codice Python, scrivi i passaggi in italiano o in pseudocodice in un commento nel file src/pathfinder.py. Esempio:
+    code Python
+
+    IGNORE_WHEN_COPYING_START
+    IGNORE_WHEN_COPYING_END
+
+        
+    # Funzione A*(start, goal, graph, heuristic):
+    # 1. Inizializza open_list (coda di priorità) e mettici dentro il nodo di partenza.
+    # 2. Inizializza due dizionari: g_costs e came_from.
+    # 3. Mentre open_list non è vuota:
+    #    a. Prendi il nodo `current` con il f_cost più basso.
+    #    b. Se `current` è la destinazione, ricostruisci il percorso usando came_from e terminalo.
+    #    c. Per ogni `neighbor` di `current`:
+    #       i. Calcola il nuovo g_cost per arrivare a `neighbor`.
+    #       ii. Se il nuovo g_cost è migliore di quello che avevamo, aggiorna...
+    # ...e così via.
+
+      
+
+    Traduci in Python: Implementa la logica passo dopo passo.
+
+        Per la coda di priorità, usa il modulo heapq di Python.
+
+        Il grafo di networkx ti darà i vicini di un nodo (graph.neighbors(node)) e i dati degli archi (come la lunghezza, che userai per il g_cost).
+
+        Dovrai accedere agli attributi dei nodi (coordinate) per calcolare l'euristica. Esplora un nodo del grafo nel notebook (graph.nodes[node_id]) per vedere come sono strutturati i dati.
+
+Consiglio: Testalo prima su un grafo molto piccolo che puoi disegnare su carta, in modo da poter seguire l'algoritmo passo passo e verificare che il tuo codice stia facendo la cosa giusta.
+Passo 5: La Visualizzazione (src/plotter.py)
+
+Ora che hai un percorso (una lista di ID di nodi), vuoi vederlo.
+
+Il tuo processo:
+
+    Domanda Guida: "Come posso disegnare un percorso su una mappa con OSMnx?"
+
+    Azione: Cerca "osmnx plot route". Troverai osmnx.plot_graph_route().
+
+    Sperimenta nel Notebook: Dopo aver eseguito il tuo A* e ottenuto una lista di nodi, passala a questa funzione insieme al grafo.
+
+    Crea il modulo plotter.py: Incapsula questa logica in una funzione o in una classe semplice, in modo da poterla richiamare facilmente da main.py.
+
+Passo 6: Mettere Tutto Insieme (main.py)
+
+Questo è lo script finale che orchestra l'intero processo.
+
+Obiettivo: Creare un'applicazione da riga di comando che prende due coppie di coordinate e mostra il percorso più breve.
+
+Il tuo processo:
+
+    Impara a gestire gli input: Cerca "python command line arguments". La libreria argparse è lo standard per fare questo. Ti permetterà di eseguire il tuo script in questo modo:
+    python main.py --lat1 45.46 --lon1 9.18 --lat2 45.47 --lon2 9.20
+
+    Scrivi la logica in main.py:
+
+        Importa le classi che hai creato: from src.map_loader import MapLoader, from src.pathfinder import PathFinder, etc.
+
+        Leggi gli argomenti dalla riga di comando.
+
+        Usa MapLoader per caricare la mappa.
+
+        Usa OSMnx per trovare i nodi del grafo più vicini alle coordinate di input (osmnx.nearest_nodes).
+
+        Crea un'istanza di PathFinder.
+
+        Chiama il metodo per trovare il percorso.
+
+        Se viene trovato un percorso, passalo al tuo Plotter per visualizzarlo.
+
+        Stampa a schermo informazioni utili (es. "Lunghezza del percorso: X km").
+
+Questo percorso ti guiderà dalla struttura vuota a un'applicazione completa. La parte più importante è il processo di porsi una domanda, cercare la risposta nella documentazione o online, sperimentare nel notebook e solo alla fine scrivere il codice "pulito" nel modulo corretto.
+
+In bocca al lupo, sarà un'esperienza di apprendimento eccezionale
