@@ -1,0 +1,11 @@
+# Ambiente virtuale di Python
+.venv/
+
+# Cartella per i grafi scaricati
+cache/
+
+# File generati da Python
+__pycache__/
+
+# File generati da Jupyter Notebook
+.ipynb_checkpoints/
