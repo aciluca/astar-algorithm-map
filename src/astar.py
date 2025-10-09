@@ -1,14 +1,14 @@
 import heapq
 from typing import Dict, Tuple, List, Optional
-from .heuristics import Heuristics, EuclideanHeuristic
+from .heuristics import Heuristic, EuclideanHeuristic
 from .graph import RoadGraph
 
 class AStar:
     """
     A* Pathfinding Algorithm
     """
-    
-    def __init__(self, graph: RoadGraph, heuristic: Heuristics = None):
+
+    def __init__(self, graph: RoadGraph, heuristic: Heuristic = None):
         self.graph = graph
         self.heuristic = heuristic if heuristic else EuclideanHeuristic()
 
