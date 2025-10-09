@@ -1,6 +1,6 @@
 import heapq
 from typing import Dict, Tuple, List, Optional
-from .heuretistic import Heuristics, EuclideanHeuristic
+from .heuristics import Heuristics, EuclideanHeuristic
 from .graph import RoadGraph
 
 class AStar:
