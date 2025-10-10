@@ -29,13 +29,13 @@ class AStar:
         
         came_from: Dict[int, Optional[int]] = {start: None}
         g_score: Dict[int, float] = {start: 0}
-        f_score: Dict[int, float] = {start: self.heuristic_cost(start, goal)}
+        f_score: Dict[int, float] = {start: self._heuristic_cost(start, goal)}
         
         while open_set:
             current_f, current = heapq.heappop(open_set)
             
             if current == goal:
-                return self.reconstruct_path(came_from, current), g_score[goal]
+                return self._reconstruct_path(came_from, current), g_score[goal]
             
             for neighbor, weight in self.graph.get_neighbors(current):
                 tentative_g = g_score[current] + weight
@@ -43,7 +43,7 @@ class AStar:
                 if neighbor not in g_score or tentative_g < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g
-                    f_score[neighbor] = tentative_g + self.heuristic_cost(neighbor, goal)
+                    f_score[neighbor] = tentative_g + self._heuristic_cost(neighbor, goal)
                     
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
