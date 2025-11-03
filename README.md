@@ -55,6 +55,42 @@ numpy>=1.24.0
 5. Click "Find Path with A*" to run the algorithm
 6. Watch the live visualization!
 
+### Programmatic usage
+
+```python
+from src import AStar, MapLoader, RoadGraph
+
+loader = MapLoader()
+
+# Load a drivable network around a point (lat, lon) with a 1.5 km bounding box
+graph = loader.load_map(
+    point=(45.4642, 9.19),  # Milan Cathedral
+    dist=1500,
+    network_type="drive",
+)
+
+road_graph = RoadGraph(graph)
+start = loader.get_nearest_node((45.4682, 9.1810))
+goal = loader.get_nearest_node((45.4559, 9.2043))
+
+path, cost = AStar(road_graph).find_path(start, goal)
+coordinates = loader.path_to_coordinates(path)
+```
+
+### Command-line example
+
+To generate a realistic route and export it as an interactive HTML map, run the
+example script:
+
+```bash
+python examples/realistic_route.py --save rome_route.html
+```
+
+By default the script downloads the drivable network around Rome's city centre
+and finds a path between Piazza Venezia and the Colosseum. You can customise the
+area with `--place` or `--point LAT LON`, choose a different network type, and
+provide your own start/end coordinates to inspect other routes.
+
 ## 🎯 Algorithm Details
 
 - *A Search**: Combines actual path cost (g-score) with heuristic estimate (h-score)

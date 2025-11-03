@@ -1,44 +1,64 @@
-from typing import Dict, List, Tuple, Optional
+"""Utilities for working with road-network graphs."""
+
+from __future__ import annotations
+
+from typing import Iterable, Iterator, List, Mapping, Tuple
+
 import networkx as nx
 
+
 class RoadGraph:
-    """
-    Wrapper for NetworkX graph to manage road network data.
-    """
-    
+    """Light-weight wrapper to expose graph operations needed by A*."""
+
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
-        
+
     def get_neighbors(self, node: int) -> List[Tuple[int, float]]:
-        """
-        Return neighbors of a node along with edge weights (travel time).
-        """
-        neighbors = []
-        for _, neighbor, data in self.graph.edges(node, data=True):
-            weight = data.get('travel_time', data.get('length', 1)) # default to length if travel_time not available)
-            neighbors.append((neighbor, weight))
+        """Return the neighbouring nodes and the associated travel costs."""
+
+        neighbors: List[Tuple[int, float]] = []
+        for neighbor, edges in self._iter_outgoing_edges(node):
+            cost = self._edge_cost(edges)
+            if cost is None:
+                continue
+            neighbors.append((neighbor, cost))
         return neighbors
-    
+
     def get_node_coordinates(self, node: int) -> Tuple[float, float]:
-        """
-        Get the coordinates (latitude, longitude) of a node given its ID.
-        """
+        """Return a node's latitude and longitude."""
+
         node_data = self.graph.nodes[node]
-        return node_data['y'], node_data['x']  # (latitude, longitude)
-    
+        return float(node_data["y"]), float(node_data["x"])
+
     def get_edge_weight(self, node1: int, node2: int) -> float:
-        """
-        Get the weight (travel time) of the edge between two nodes.
-        """
-        try:
-            edge_data = self.graph[node1][node2][0] # get first edge data if multiple edges exist
-            return edge_data.get('travel_time', edge_data.get('length', 1)) # default to length if travel_time not available
-        
-        except (KeyError, IndexError):
-            return float('inf') # return infinity if no edge exists
-        
+        """Return the minimum travel time between two nodes if an edge exists."""
+
+        edges = self.graph.get_edge_data(node1, node2) or {}
+        cost = self._edge_cost(edges.values())
+        return cost if cost is not None else float("inf")
+
     def get_all_nodes(self) -> List[int]:
-        """
-        Return a list of all node IDs in the graph.
-        """
+        """Return a list of all node ids present in the graph."""
+
         return list(self.graph.nodes)
+
+    def _iter_outgoing_edges(self, node: int) -> Iterator[Tuple[int, Iterable[Mapping[str, object]]]]:
+        try:
+            neighbors = self.graph.succ[node]
+        except KeyError:
+            return iter(())
+        return ((neighbor, key_dict.values()) for neighbor, key_dict in neighbors.items())
+
+    @staticmethod
+    def _edge_cost(edges: Iterable[Mapping[str, object]]) -> float | None:
+        best_cost: float | None = None
+        for data in edges:
+            weight = data.get("travel_time")
+            if weight is None:
+                weight = data.get("length")
+            if weight is None:
+                continue
+            weight = float(weight)
+            if best_cost is None or weight < best_cost:
+                best_cost = weight
+        return best_cost
