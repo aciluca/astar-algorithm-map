@@ -6,7 +6,7 @@ import heapq
 from typing import Dict, List, Optional, Tuple
 
 from .graph import RoadGraph
-from .heuristics import EuclideanHeuristic, Heuristic
+from .heuristics import Heuristic
 
 
 class AStar:
@@ -14,7 +14,7 @@ class AStar:
 
     def __init__(self, graph: RoadGraph, heuristic: Optional[Heuristic] = None):
         self.graph = graph
-        self.heuristic = heuristic if heuristic else EuclideanHeuristic()
+        self.heuristic = heuristic if heuristic else graph.default_heuristic()
 
     def find_path(self, start: int, goal: int) -> Tuple[List[int], float]:
         """Find the shortest path from ``start`` to ``goal`` using A*."""

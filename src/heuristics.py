@@ -6,6 +6,8 @@ import math
 from abc import ABC, abstractmethod
 from typing import Tuple
 
+DEFAULT_MAX_SPEED_KPH = 130.0
+
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Return the great-circle distance between two geographic coordinates."""
@@ -41,6 +43,21 @@ class EuclideanHeuristic(Heuristic):
         lat1, lon1 = node1
         lat2, lon2 = node2
         return haversine_distance(lat1, lon1, lat2, lon2)
+
+
+class TravelTimeHeuristic(Heuristic):
+    """Estimate the minimum travel time assuming an optimistic top speed."""
+
+    def __init__(self, max_speed_m_s: float = DEFAULT_MAX_SPEED_KPH / 3.6) -> None:
+        if max_speed_m_s <= 0:
+            raise ValueError("max_speed_m_s must be positive")
+        self.max_speed_m_s = float(max_speed_m_s)
+
+    def calculate(self, node1: Tuple[float, float], node2: Tuple[float, float]) -> float:
+        lat1, lon1 = node1
+        lat2, lon2 = node2
+        distance = haversine_distance(lat1, lon1, lat2, lon2)
+        return distance / self.max_speed_m_s
 
 
 class ManhattanHeuristic(Heuristic):

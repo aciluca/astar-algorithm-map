@@ -8,6 +8,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import networkx as nx
 import osmnx as ox
 
+DEFAULT_MAX_SPEED_KPH = 130.0
+
 
 @dataclass(frozen=True)
 class PathMetrics:
@@ -36,6 +38,7 @@ class MapLoader:
     def __init__(self) -> None:
         self.graph: Optional[nx.MultiDiGraph] = None
         self.place_name: Optional[str] = None
+        self._max_speed_m_s: float = DEFAULT_MAX_SPEED_KPH / 3.6
 
     def load_map(
         self,
@@ -79,6 +82,7 @@ class MapLoader:
 
             self.graph = ox.add_edge_speeds(self.graph)
             self.graph = ox.add_edge_travel_times(self.graph)
+            self._max_speed_m_s = self._compute_max_speed(self.graph)
             return self.graph
         except Exception as exc:  # pragma: no cover - transparent error reporting
             raise RuntimeError(f"Error loading map: {exc}") from exc
@@ -116,7 +120,11 @@ class MapLoader:
 
         for edge_data in self._iter_edge_attributes(path):
             length = float(edge_data.get("length", 0.0))
-            travel_time = float(edge_data.get("travel_time", length))
+            travel_time_attr = edge_data.get("travel_time")
+            if travel_time_attr is not None:
+                travel_time = float(travel_time_attr)
+            else:
+                travel_time = self._length_to_travel_time(length, edge_data)
 
             total_length += length
             total_time += travel_time
@@ -152,3 +160,53 @@ class MapLoader:
                 key=lambda data: data.get("travel_time", data.get("length", float("inf"))),
             )
             yield best_edge
+
+    def _compute_max_speed(self, graph: nx.MultiDiGraph) -> float:
+        max_speed_kph = 0.0
+        for _, _, data in graph.edges(data=True):
+            speed = self._edge_speed_kph(data)
+            if speed is not None and speed > max_speed_kph:
+                max_speed_kph = speed
+        if max_speed_kph <= 0:
+            max_speed_kph = DEFAULT_MAX_SPEED_KPH
+        return max_speed_kph / 3.6
+
+    def _length_to_travel_time(self, length: float, edge_data: Mapping[str, object]) -> float:
+        speed = self._edge_speed_m_s(edge_data) or self._max_speed_m_s
+        if speed <= 0:
+            return 0.0
+        return length / speed
+
+    def _edge_speed_m_s(self, data: Mapping[str, object]) -> Optional[float]:
+        speed_kph = self._edge_speed_kph(data)
+        return speed_kph / 3.6 if speed_kph is not None else None
+
+    def _edge_speed_kph(self, data: Mapping[str, object]) -> Optional[float]:
+        speed = data.get("speed_kph") or data.get("maxspeed")
+        if isinstance(speed, (list, tuple)) and speed:
+            speed = speed[0]
+        if isinstance(speed, str):
+            if ";" in speed:
+                speed = speed.split(";")[0]
+            speed = speed.replace("km/h", "").replace("kph", "").strip()
+            if "mph" in speed.lower():
+                value = self._coerce_float(speed.lower().replace("mph", ""))
+                return value * 1.60934 if value is not None else None
+            return self._coerce_float(speed)
+        return self._coerce_float(speed)
+
+    @staticmethod
+    def _coerce_float(value: object) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None

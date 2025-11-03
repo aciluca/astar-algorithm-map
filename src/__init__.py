@@ -7,6 +7,7 @@ from .heuristics import (
     Heuristic,
     ManhattanHeuristic,
     ZeroHeuristic,
+    TravelTimeHeuristic,
     haversine_distance,
 )
 from .map_loader import MapLoader, PathMetrics
@@ -17,6 +18,7 @@ __all__ = [
     "EuclideanHeuristic",
     "ManhattanHeuristic",
     "ZeroHeuristic",
+    "TravelTimeHeuristic",
     "haversine_distance",
     "PathMetrics",
     "MapLoader",
