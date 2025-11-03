@@ -12,8 +12,7 @@ OpenStreetMap basemap and reuse the underlying Python API in your own projects.
 
 ## 🚀 Features
 
-- **Streamlit front-end** – discover the algorithm through an interactive UI: pick any city, geocode addresses, paste lat/lon coordinates or drop waypoints on the map and compare fastest vs. shortest routes.
-- **Manual waypoint placement** – preload the densified OpenStreetMap network, then click to choose start and destination nodes that align with the underlying streets.
+- **Streamlit front-end** – discover the algorithm through an interactive UI: pick any city, geocode addresses or paste lat/lon coordinates and compare fastest vs. shortest routes.
 - **Real OpenStreetMap data** – download drivable, walkable or bikeable graphs with OSMnx and reuse them in custom experiments.
 - **Reusable pathfinding core** – production-ready A* and Dijkstra implementations operating on NetworkX graphs, plus helpers to convert paths into coordinates and metrics.
 - **Command-line automation** – `examples/realistic_route.py` fetches a network, computes a route and exports it as an interactive Folium map.
@@ -49,15 +48,11 @@ From the sidebar you can:
 - Choose the **OpenStreetMap area** (by city name) and network type (drive, walk, bike, service).
 - Decide whether the cost function should optimise **travel time** or **distance**.
 - Toggle map preprocessing options exposed by OSMnx (graph simplification and component retention).
-- Control the **spacing of synthetic road nodes** (down to every metre) to make map clicks snap to realistic points along streets.
-- Pick the **start and destination** via address geocoding, by entering latitude/longitude pairs or by clicking directly on the preloaded map.
+- Pick the **start and destination** either via address geocoding or by entering latitude/longitude pairs.
 - Customise the colour of the rendered polyline and whether it should follow the true street geometry.
 
-After clicking **Preload map data** you can place the start and destination on the
-map itself. The app subdivides every edge of the network so that consecutive
-nodes are roughly one metre apart, ensuring that mouse clicks snap to the
-nearest realistic waypoint. Once both endpoints are set, choose **Calculate
-route** to display path metrics and the rendered itinerary inside Streamlit.
+After clicking **Calculate route** the page displays the path metrics and renders
+the result on an interactive Folium map embedded inside Streamlit.
 
 ### Command-line example
 
