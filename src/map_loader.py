@@ -102,11 +102,51 @@ class MapLoader:
         node = self.graph.nodes[node_id]
         return node["y"], node["x"]
 
-    def path_to_coordinates(self, path: Sequence[int]) -> List[Tuple[float, float]]:
-        """Convert a sequence of node ids into geographic coordinates."""
+    def path_to_coordinates(
+        self,
+        path: Sequence[int],
+        *,
+        include_edge_geometry: bool = False,
+    ) -> List[Tuple[float, float]]:
+        """Convert a sequence of node ids into geographic coordinates.
+
+        Parameters
+        ----------
+        path:
+            Sequence of node identifiers describing the route.
+        include_edge_geometry:
+            When ``True`` the coordinates of each road segment's geometry are
+            included so the resulting polyline follows the actual street
+            curvature instead of straight lines between intersections.
+        """
 
         self._ensure_graph_loaded()
-        return [self.get_node_coordinates(node_id) for node_id in path]
+        assert self.graph is not None
+
+        if not path:
+            return []
+
+        coordinates: List[Tuple[float, float]] = []
+        for index, node_id in enumerate(path):
+            coordinates.append(self.get_node_coordinates(node_id))
+            if not include_edge_geometry or index == len(path) - 1:
+                continue
+
+            next_node = path[index + 1]
+            segment_points = self._edge_geometry_points(node_id, next_node)
+            if not segment_points:
+                continue
+
+            # Skip the first geometry point because it matches the current node.
+            for lat, lon in segment_points[1:-1]:
+                coordinates.append((lat, lon))
+
+            last_lat, last_lon = segment_points[-1]
+            next_lat, next_lon = self.get_node_coordinates(next_node)
+            if abs(last_lat - next_lat) > 1e-9 or abs(last_lon - next_lon) > 1e-9:
+                coordinates.append((last_lat, last_lon))
+
+        return coordinates
 
     def calculate_path_metrics(self, path: Sequence[int]) -> PathMetrics:
         """Return aggregated metrics (length and travel time) for ``path``."""
@@ -152,14 +192,69 @@ class MapLoader:
 
         for src, dst in zip(path, path[1:]):
             edge_bundle = self.graph.get_edge_data(src, dst) or {}
-            if not edge_bundle:
+            best_edge = self._select_best_edge(edge_bundle)
+            if best_edge is None:
                 continue
-
-            best_edge = min(
-                edge_bundle.values(),
-                key=lambda data: data.get("travel_time", data.get("length", float("inf"))),
-            )
             yield best_edge
+
+    def _edge_geometry_points(
+        self, src: int, dst: int
+    ) -> List[Tuple[float, float]]:
+        assert self.graph is not None
+
+        edge_bundle = self.graph.get_edge_data(src, dst) or {}
+        best_edge = self._select_best_edge(edge_bundle)
+        if best_edge is None:
+            return []
+
+        geometry = best_edge.get("geometry")
+        if geometry is None:
+            return []
+
+        if hasattr(geometry, "geoms"):
+            coords_iter = []
+            for geom in geometry.geoms:
+                if hasattr(geom, "coords"):
+                    coords_iter.extend(list(geom.coords))
+        elif hasattr(geometry, "coords"):
+            coords_iter = geometry.coords
+        elif isinstance(geometry, (list, tuple)):
+            coords_iter = geometry
+        else:
+            return []
+
+        points: List[Tuple[float, float]] = []
+        for coord in coords_iter:
+            if not coord or len(coord) < 2:
+                continue
+            lon, lat = coord[0], coord[1]
+            points.append((lat, lon))
+        return points
+
+    def _select_best_edge(
+        self, edge_bundle: Mapping[object, Mapping[str, object]]
+    ) -> Optional[Mapping[str, object]]:
+        if not edge_bundle:
+            return None
+
+        best_key: Optional[object] = None
+        best_cost = float("inf")
+
+        for key, data in edge_bundle.items():
+            travel_time = self._coerce_float(data.get("travel_time"))
+            if travel_time is not None:
+                cost = travel_time
+            else:
+                length = self._coerce_float(data.get("length"))
+                cost = length if length is not None else float("inf")
+
+            if cost < best_cost:
+                best_key = key
+                best_cost = cost
+
+        if best_key is None or best_cost == float("inf"):
+            return None
+        return edge_bundle[best_key]
 
     def _compute_max_speed(self, graph: nx.MultiDiGraph) -> float:
         max_speed_kph = 0.0

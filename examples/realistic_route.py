@@ -86,7 +86,7 @@ def main() -> int:
         return 1
 
     metrics = loader.calculate_path_metrics(path)
-    coordinates = loader.path_to_coordinates(path)
+    coordinates = loader.path_to_coordinates(path, include_edge_geometry=True)
 
     print(f"Location: {location_name}")
     print(f"Nodes explored: {len(path)}")

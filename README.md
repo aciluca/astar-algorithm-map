@@ -74,7 +74,8 @@ start = loader.get_nearest_node((45.4682, 9.1810))
 goal = loader.get_nearest_node((45.4559, 9.2043))
 
 path, cost = AStar(road_graph).find_path(start, goal)
-coordinates = loader.path_to_coordinates(path)
+# Include the intermediate geometry points so the route follows the road shape
+coordinates = loader.path_to_coordinates(path, include_edge_geometry=True)
 ```
 
 ### Command-line example
@@ -89,7 +90,9 @@ python examples/realistic_route.py --save rome_route.html
 By default the script downloads the drivable network around Rome's city centre
 and finds a path between Piazza Venezia and the Colosseum. You can customise the
 area with `--place` or `--point LAT LON`, choose a different network type, and
-provide your own start/end coordinates to inspect other routes.
+provide your own start/end coordinates to inspect other routes. The generated
+polyline uses the real OpenStreetMap geometry for every road segment, so the
+route hugs the actual streets instead of straight lines between intersections.
 
 ## 🎯 Algorithm Details
 
