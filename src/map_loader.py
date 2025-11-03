@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import itertools
+import math
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import networkx as nx
 import osmnx as ox
+from shapely.geometry import LineString, MultiLineString, Point
 
 DEFAULT_MAX_SPEED_KPH = 130.0
 
@@ -51,6 +54,7 @@ class MapLoader:
         simplify: bool = True,
         retain_all: bool = False,
         custom_filter: Optional[str] = None,
+        densify_max_length_m: Optional[float] = None,
     ) -> nx.MultiDiGraph:
         """Download a routable street network and add travel-time metadata."""
 
@@ -83,9 +87,104 @@ class MapLoader:
             self.graph = ox.add_edge_speeds(self.graph)
             self.graph = ox.add_edge_travel_times(self.graph)
             self._max_speed_m_s = self._compute_max_speed(self.graph)
+            if densify_max_length_m is not None:
+                self.densify_edges(densify_max_length_m)
+                self._max_speed_m_s = self._compute_max_speed(self.graph)
             return self.graph
         except Exception as exc:  # pragma: no cover - transparent error reporting
             raise RuntimeError(f"Error loading map: {exc}") from exc
+
+    def densify_edges(self, max_segment_length_m: float) -> nx.MultiDiGraph:
+        """Insert synthetic nodes along edges so no segment exceeds the target length."""
+
+        if max_segment_length_m <= 0:
+            raise ValueError("max_segment_length_m must be greater than zero")
+
+        self._ensure_graph_loaded()
+        assert self.graph is not None
+
+        original_graph = self.graph
+        densified_graph = nx.MultiDiGraph()
+        densified_graph.graph.update(original_graph.graph)
+
+        for node_id, data in original_graph.nodes(data=True):
+            densified_graph.add_node(node_id, **data)
+
+        virtual_ids = (f"virtual_{index}" for index in itertools.count())
+
+        for u, v, key, data in original_graph.edges(keys=True, data=True):
+            total_length = float(data.get("length", 0.0))
+            if total_length <= max_segment_length_m or total_length == 0:
+                densified_graph.add_edge(u, v, key=key, **data)
+                continue
+
+            geometry = data.get("geometry")
+            if isinstance(geometry, LineString):
+                base_line = geometry
+            elif isinstance(geometry, MultiLineString):
+                coords = [coord for line in geometry.geoms for coord in line.coords]
+                base_line = LineString(coords)
+            else:
+                ux, uy = original_graph.nodes[u]["x"], original_graph.nodes[u]["y"]
+                vx, vy = original_graph.nodes[v]["x"], original_graph.nodes[v]["y"]
+                base_line = LineString([(ux, uy), (vx, vy)])
+
+            segment_count = int(math.ceil(total_length / max_segment_length_m))
+            if segment_count <= 1:
+                densified_graph.add_edge(u, v, key=key, **data)
+                continue
+
+            points: List[Point] = [
+                Point(original_graph.nodes[u]["x"], original_graph.nodes[u]["y"])
+            ]
+            for index in range(1, segment_count):
+                points.append(base_line.interpolate(index / segment_count, normalized=True))
+            points.append(Point(original_graph.nodes[v]["x"], original_graph.nodes[v]["y"]))
+
+            node_sequence: List[int | str] = [u]
+            for point in points[1:-1]:
+                node_id = next(virtual_ids)
+                densified_graph.add_node(
+                    node_id,
+                    x=float(point.x),
+                    y=float(point.y),
+                    lon=float(point.x),
+                    lat=float(point.y),
+                    virtual=True,
+                )
+                node_sequence.append(node_id)
+            node_sequence.append(v)
+
+            travel_time_attr = data.get("travel_time")
+            if travel_time_attr is not None:
+                total_travel_time = float(travel_time_attr)
+            else:
+                total_travel_time = self._length_to_travel_time(total_length, data)
+
+            for index, (src, dst) in enumerate(zip(node_sequence, node_sequence[1:]), start=1):
+                segment_length = total_length / segment_count
+                segment_data = dict(data)
+                segment_data["length"] = segment_length
+                if total_travel_time:
+                    segment_data["travel_time"] = total_travel_time / segment_count
+                else:
+                    segment_data["travel_time"] = self._length_to_travel_time(segment_length, data)
+                segment_data["u"] = src
+                segment_data["v"] = dst
+
+                segment_geometry = LineString(
+                    [
+                        (float(points[index - 1].x), float(points[index - 1].y)),
+                        (float(points[index].x), float(points[index].y)),
+                    ]
+                )
+                segment_data["geometry"] = segment_geometry
+
+                segment_key = f"{key}_{index}" if key is not None else index
+                densified_graph.add_edge(src, dst, key=segment_key, **segment_data)
+
+        self.graph = densified_graph
+        return densified_graph
 
     def get_nearest_node(self, point: Tuple[float, float]) -> int:
         """Return the node id closest to the provided (lat, lon) coordinates."""
